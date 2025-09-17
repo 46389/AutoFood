@@ -1,6 +1,6 @@
 # AutoFood
 
-A Django-based web application that recognizes food from images using YOLO models and helps estimate portions and pricing. It includes an admin dashboard, user auth, seeded menu/categories, media uploads, and result visualization.
+A Django-based web application that recognizes food from images using YOLO models and helps estimate portions and pricing. It includes an admin dashboard, user auth, food menu & categories management, food detection and visualization.
 
 ## Features
 - Image upload and food detection using YOLO (`ai_models/`)
