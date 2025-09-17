@@ -704,16 +704,25 @@ def edit_detection(request, item_id):
         try:
             # Update basic fields
             item.class_label = class_label
-            item.quantity = max(0.01, round(quantity, 2))  # Allow 2 decimal places, minimum 0.01
-            
+
             # Update menu item if provided
             if menu_item_id:
                 menu_item = MenuItem.objects.get(id=menu_item_id)
                 item.menu_item = menu_item
+
+                # Set quantity based on pricing unit
+                if menu_item.pricing_unit == 'item':
+                    # For per item pricing, use integer quantity (minimum 1)
+                    item.quantity = max(1, int(round(quantity)))
+                else:
+                    # For per serving pricing, allow decimal quantity (minimum 0.01)
+                    item.quantity = max(0.01, round(quantity, 2))
+
                 # Recalculate price
                 item.calculated_price = float(menu_item.price) * item.quantity
             else:
                 item.menu_item = None
+                item.quantity = max(0.01, round(quantity, 2))  # Default to decimal when no menu item
                 item.calculated_price = 0.00
             
             item.save()
@@ -746,17 +755,25 @@ def add_manual_item(request, detection_id):
         
         try:
             menu_item = MenuItem.objects.get(id=menu_item_id)
-            
+
+            # Set quantity based on pricing unit
+            if menu_item.pricing_unit == 'item':
+                # For per item pricing, use integer quantity (minimum 1)
+                final_quantity = max(1, int(round(quantity)))
+            else:
+                # For per serving pricing, allow decimal quantity (minimum 0.01)
+                final_quantity = max(0.01, round(quantity, 2))
+
             # Calculate price
-            calculated_price = float(menu_item.price) * quantity
-            
+            calculated_price = float(menu_item.price) * final_quantity
+
             # Create the detected item
             DetectedItem.objects.create(
                 detection=detection,
                 menu_item=menu_item,
                 class_label=menu_item.name,  # Use menu item name as class label
                 confidence=1.0,
-                quantity=round(quantity, 2),
+                quantity=final_quantity,
                 bbox_x=0,
                 bbox_y=0,
                 bbox_width=100,
@@ -766,7 +783,7 @@ def add_manual_item(request, detection_id):
                 is_manually_added=True
             )
             
-            messages.success(request, f'Added {menu_item.name} (Qty: {quantity:.2f}) successfully!')
+            messages.success(request, f'Added {menu_item.name} (Qty: {final_quantity:.2f}) successfully!')
             return redirect('detection_results', detection_id=detection_id)
             
         except (MenuItem.DoesNotExist, ValueError) as e:
@@ -787,10 +804,15 @@ def update_item_quantity(request):
             
             # Get the detected item
             item = get_object_or_404(DetectedItem, id=item_id, detection__user=request.user)
-            
-            # Update quantity (minimum 0.01)
-            item.quantity = max(0.01, round(quantity, 2))
-            
+
+            # Update quantity based on pricing unit
+            if item.menu_item and item.menu_item.pricing_unit == 'item':
+                # For per item pricing, use integer quantity (minimum 1)
+                item.quantity = max(1, int(round(quantity)))
+            else:
+                # For per serving pricing or no menu item, allow decimal quantity (minimum 0.01)
+                item.quantity = max(0.01, round(quantity, 2))
+
             # Recalculate price
             if item.menu_item:
                 item.calculated_price = float(item.menu_item.price) * item.quantity

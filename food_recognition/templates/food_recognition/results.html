@@ -142,12 +142,16 @@
                                     <div class="col-6">
                                         <label class="form-label small">Quantity:</label>
                                         <div class="input-group input-group-sm">
-                                            <button class="btn btn-outline-secondary" type="button" onclick="changeQuantity({{ item.id }}, -0.1)">-</button>
-                                            <input type="number" class="form-control text-center" value="{{ item.quantity|floatformat:2 }}" 
-                                                   min="0.01" step="0.01" id="qty-{{ item.id }}" 
-                                                   data-item-id="{{ item.id }}" data-menu-price="{% if item.menu_item %}{{ item.menu_item.price }}{% else %}0{% endif %}"
+                                            <button class="btn btn-outline-secondary" type="button" onclick="changeQuantity({{ item.id }}, {% if item.menu_item.pricing_unit == 'item' %}-1{% else %}-0.1{% endif %})">-</button>
+                                            <input type="number" class="form-control text-center" value="{{ item.quantity|floatformat:2 }}"
+                                                   min="{% if item.menu_item.pricing_unit == 'item' %}1{% else %}0.01{% endif %}"
+                                                   step="{% if item.menu_item.pricing_unit == 'item' %}1{% else %}0.01{% endif %}"
+                                                   id="qty-{{ item.id }}"
+                                                   data-item-id="{{ item.id }}"
+                                                   data-menu-price="{% if item.menu_item %}{{ item.menu_item.price }}{% else %}0{% endif %}"
+                                                   data-pricing-unit="{% if item.menu_item %}{{ item.menu_item.pricing_unit }}{% else %}serving{% endif %}"
                                                    onchange="updateItemQuantity({{ item.id }})" oninput="updateItemQuantity({{ item.id }})">
-                                            <button class="btn btn-outline-secondary" type="button" onclick="changeQuantity({{ item.id }}, 0.1)">+</button>
+                                            <button class="btn btn-outline-secondary" type="button" onclick="changeQuantity({{ item.id }}, {% if item.menu_item.pricing_unit == 'item' %}1{% else %}0.1{% endif %})">+</button>
                                         </div>
                                     </div>
                                     <div class="col-6 text-end">
@@ -246,9 +250,9 @@
                     
                     <div class="mb-3">
                         <label for="quantityInput" class="form-label">Quantity *</label>
-                        <input type="number" class="form-control" id="quantityInput" name="quantity" 
-                               step="0.01" min="0.01" value="1.00" required oninput="updateSubtotal()" 
-                               onchange="this.value = parseFloat(this.value || 0).toFixed(2)">
+                        <input type="number" class="form-control" id="quantityInput" name="quantity"
+                               step="0.01" min="0.01" value="1.00" required oninput="updateSubtotal()"
+                               onchange="validateQuantityInput(this)">
                         <small class="text-muted" id="quantityHelper">Enter quantity in servings or items</small>
                     </div>
 
@@ -320,9 +324,9 @@
                     
                     <div class="mb-3">
                         <label for="editQuantityInput" class="form-label">Quantity *</label>
-                        <input type="number" class="form-control" id="editQuantityInput" name="quantity" 
+                        <input type="number" class="form-control" id="editQuantityInput" name="quantity"
                                step="0.01" min="0.01" required oninput="updateEditSubtotal()"
-                               onchange="this.value = parseFloat(this.value || 0).toFixed(2)">
+                               onchange="validateEditQuantityInput(this)">
                         <small class="text-muted" id="editQuantityHelper">Enter quantity</small>
                     </div>
 
@@ -367,20 +371,30 @@ function updateItemPrice() {
     const unitPriceSpan = document.getElementById('unitPrice');
     const quantityHelper = document.getElementById('quantityHelper');
     const classLabelInput = document.getElementById('classLabelInput');
-    
+    const quantityInput = document.getElementById('quantityInput');
+
     if (selectedOption.value) {
         const price = parseFloat(selectedOption.dataset.price);
         const pricingUnit = selectedOption.dataset.pricingUnit;
         const itemName = selectedOption.dataset.name;
-        
+
         // Update class label
         classLabelInput.value = itemName;
-        
+
+        // Update quantity input attributes based on pricing unit
+        if (pricingUnit === 'item') {
+            quantityInput.step = '1';
+            quantityInput.min = '1';
+            quantityInput.value = '1';
+            quantityHelper.textContent = 'Enter quantity in items (e.g., 2 items)';
+        } else {
+            quantityInput.step = '0.01';
+            quantityInput.min = '0.01';
+            quantityInput.value = '1.00';
+            quantityHelper.textContent = 'Enter quantity in servings (e.g., 1.5 servings)';
+        }
+
         unitPriceSpan.textContent = `RM${price.toFixed(2)}`;
-        quantityHelper.textContent = pricingUnit === 'serving' ? 
-            'Enter quantity in servings (e.g., 1.5 servings)' : 
-            'Enter quantity in items (e.g., 2 items)';
-        
         addBtn.disabled = false;
         updateSubtotal();
     } else {
@@ -398,16 +412,47 @@ function updateSubtotal() {
     const selectedOption = select.options[select.selectedIndex];
     const displayQuantitySpan = document.getElementById('displayQuantity');
     const subtotalSpan = document.getElementById('subtotal');
-    
-    const quantity = parseFloat(quantityInput.value) || 0;
-    displayQuantitySpan.textContent = quantity.toFixed(2);
-    
+
+    let quantity = parseFloat(quantityInput.value) || 0;
+
     if (selectedOption.value && quantity > 0) {
         const price = parseFloat(selectedOption.dataset.price);
+        const pricingUnit = selectedOption.dataset.pricingUnit;
+
+        // Format quantity display based on pricing unit
+        if (pricingUnit === 'item') {
+            quantity = Math.max(1, Math.round(quantity));
+            displayQuantitySpan.textContent = quantity.toString();
+        } else {
+            quantity = Math.max(0.01, quantity);
+            displayQuantitySpan.textContent = quantity.toFixed(2);
+        }
+
         const subtotal = price * quantity;
         subtotalSpan.textContent = `RM${subtotal.toFixed(2)}`;
     } else {
+        displayQuantitySpan.textContent = quantity.toFixed(2);
         subtotalSpan.textContent = 'RM0.00';
+    }
+}
+
+function validateQuantityInput(input) {
+    const select = document.getElementById('menuItemSelect');
+    const selectedOption = select.options[select.selectedIndex];
+
+    if (selectedOption.value) {
+        const pricingUnit = selectedOption.dataset.pricingUnit;
+        let quantity = parseFloat(input.value) || 0;
+
+        if (pricingUnit === 'item') {
+            // For items, ensure integer and minimum 1
+            quantity = Math.max(1, Math.round(quantity));
+            input.value = quantity;
+        } else {
+            // For servings, ensure minimum 0.01 and format to 2 decimals
+            quantity = Math.max(0.01, quantity);
+            input.value = quantity.toFixed(2);
+        }
     }
 }
 
@@ -427,26 +472,37 @@ function updateItemQuantity(itemId) {
     const qtyInput = document.getElementById('qty-' + itemId);
     const qtyDisplay = document.getElementById('qty-display-' + itemId);
     const priceDisplay = document.getElementById('price-' + itemId);
-    
+
     if (!qtyInput || !qtyDisplay || !priceDisplay) return;
-    
-    const quantity = parseFloat(qtyInput.value) || 0.01;
+
+    let quantity = parseFloat(qtyInput.value) || 0.01;
     const unitPrice = parseFloat(qtyInput.dataset.menuPrice) || 0;
-    
-    // Ensure minimum quantity
-    if (quantity < 0.01) {
-        qtyInput.value = 0.01;
-        return;
+    const pricingUnit = qtyInput.dataset.pricingUnit || 'serving';
+
+    // Handle quantity based on pricing unit
+    if (pricingUnit === 'item') {
+        // For per item pricing, ensure integer and minimum 1
+        quantity = Math.max(1, Math.round(quantity));
+        qtyInput.value = quantity;
+    } else {
+        // For per serving pricing, ensure minimum 0.01
+        quantity = Math.max(0.01, quantity);
+        qtyInput.value = quantity.toFixed(2);
     }
-    
+
     // Update displays
-    qtyDisplay.textContent = quantity.toFixed(2);
+    if (pricingUnit === 'item') {
+        qtyDisplay.textContent = quantity.toString();
+    } else {
+        qtyDisplay.textContent = quantity.toFixed(2);
+    }
+
     const subtotal = quantity * unitPrice;
     priceDisplay.textContent = subtotal.toFixed(2);
-    
+
     // Update total
     updateGrandTotal();
-    
+
     // Send AJAX request to update backend (debounced)
     clearTimeout(updateItemQuantity.timer);
     updateItemQuantity.timer = setTimeout(() => {
@@ -538,25 +594,40 @@ function updateEditItemPrice() {
     const unitPriceSpan = document.getElementById('editUnitPrice');
     const quantityHelper = document.getElementById('editQuantityHelper');
     const classLabelInput = document.getElementById('editClassLabelInput');
-    
+    const quantityInput = document.getElementById('editQuantityInput');
+
     if (selectedOption.value) {
         const price = parseFloat(selectedOption.dataset.price);
         const pricingUnit = selectedOption.dataset.pricingUnit;
         const itemName = selectedOption.dataset.name;
-        
+
         // Update class label
         classLabelInput.value = itemName;
-        
+
+        // Update quantity input attributes based on pricing unit
+        if (pricingUnit === 'item') {
+            quantityInput.step = '1';
+            quantityInput.min = '1';
+            // Round current value to integer if it exists
+            const currentValue = parseFloat(quantityInput.value) || 1;
+            quantityInput.value = Math.max(1, Math.round(currentValue));
+            quantityHelper.textContent = 'Enter quantity in items (e.g., 2 items)';
+        } else {
+            quantityInput.step = '0.01';
+            quantityInput.min = '0.01';
+            // Ensure current value has 2 decimal places if it exists
+            const currentValue = parseFloat(quantityInput.value) || 1;
+            quantityInput.value = Math.max(0.01, currentValue).toFixed(2);
+            quantityHelper.textContent = 'Enter quantity in servings (e.g., 1.5 servings)';
+        }
+
         unitPriceSpan.textContent = `RM${price.toFixed(2)}`;
-        quantityHelper.textContent = pricingUnit === 'serving' ? 
-            'Enter quantity in servings (e.g., 1.5 servings)' : 
-            'Enter quantity in items (e.g., 2 items)';
     } else {
         // Don't clear class label when no menu item selected, keep original
         unitPriceSpan.textContent = 'RM0.00';
         quantityHelper.textContent = 'Enter quantity';
     }
-    
+
     updateEditSubtotal();
 }
 
@@ -566,16 +637,47 @@ function updateEditSubtotal() {
     const selectedOption = select.options[select.selectedIndex];
     const displayQuantitySpan = document.getElementById('editDisplayQuantity');
     const subtotalSpan = document.getElementById('editSubtotal');
-    
-    const quantity = parseFloat(quantityInput.value) || 0;
-    displayQuantitySpan.textContent = quantity.toFixed(2);
-    
+
+    let quantity = parseFloat(quantityInput.value) || 0;
+
     if (selectedOption.value && quantity > 0) {
         const price = parseFloat(selectedOption.dataset.price);
+        const pricingUnit = selectedOption.dataset.pricingUnit;
+
+        // Format quantity display based on pricing unit
+        if (pricingUnit === 'item') {
+            quantity = Math.max(1, Math.round(quantity));
+            displayQuantitySpan.textContent = quantity.toString();
+        } else {
+            quantity = Math.max(0.01, quantity);
+            displayQuantitySpan.textContent = quantity.toFixed(2);
+        }
+
         const subtotal = price * quantity;
         subtotalSpan.textContent = `RM${subtotal.toFixed(2)}`;
     } else {
+        displayQuantitySpan.textContent = quantity.toFixed(2);
         subtotalSpan.textContent = 'RM0.00';
+    }
+}
+
+function validateEditQuantityInput(input) {
+    const select = document.getElementById('editMenuItemSelect');
+    const selectedOption = select.options[select.selectedIndex];
+
+    if (selectedOption.value) {
+        const pricingUnit = selectedOption.dataset.pricingUnit;
+        let quantity = parseFloat(input.value) || 0;
+
+        if (pricingUnit === 'item') {
+            // For items, ensure integer and minimum 1
+            quantity = Math.max(1, Math.round(quantity));
+            input.value = quantity;
+        } else {
+            // For servings, ensure minimum 0.01 and format to 2 decimals
+            quantity = Math.max(0.01, quantity);
+            input.value = quantity.toFixed(2);
+        }
     }
 }
 
