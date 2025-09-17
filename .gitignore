@@ -1,2 +1,4 @@
 .venv
 mobileclip_blt.ts
+__pycache__
+yoloe-11m-seg.pt
