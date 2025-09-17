@@ -1,4 +1,46 @@
+# Existing entries
 .venv
 mobileclip_blt.ts
 __pycache__
 yoloe-11m-seg.pt
+db.sqlite3
+
+# Python cache/artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Environment/config
+.env
+*.env
+
+# Django/DB
+*.sqlite3
+
+# Static & media (generated/large)
+static/
+staticfiles/
+media/
+media/uploads/
+media/predictions/
+
+# Model weights and large checkpoints
+ai_models/
+*.pt
+*.pth
+
+# OS/IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Node (if any)
+node_modules/
