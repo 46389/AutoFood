@@ -1,0 +1,285 @@
+{% extends 'food_recognition/base.html' %}
+
+{% block title %}Menu Price Management - AutoFood{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="fas fa-list"></i> Menu Price Management</h2>
+                <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addItemModal">
+                    <i class="fas fa-plus"></i> Add New Item
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Menu Items List -->
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-utensils"></i> Current Menu Items</h5>
+                </div>
+                <div class="card-body">
+                    {% if menu_items %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Item Name</th>
+                                    <th>Price</th>
+                                    <th>Description</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in menu_items %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ item.name|title }}</strong>
+                                    </td>
+                                    <td>
+                                        <span class="h5 text-success">RM{{ item.price }}</span>
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">
+                                            {{ item.description|truncatewords:10|default:"No description" }}
+                                        </small>
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">{{ item.created_at|date:"M d, Y" }}</small>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button type="button" class="btn btn-outline-primary" 
+                                                    onclick="editItem({{ item.id }}, '{{ item.name }}', '{{ item.price }}', '{{ item.description|escapejs }}')">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <form method="post" action="{% url 'delete_menu_item' item.id %}" style="display: inline;">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn btn-outline-danger" 
+                                                        onclick="return confirm('Are you sure you want to delete {{ item.name }}?')">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center text-muted py-5">
+                        <i class="fas fa-utensils fa-3x mb-3"></i>
+                        <h5>No menu items yet</h5>
+                        <p>Add your first menu item to start managing prices for detected food items.</p>
+                        <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addItemModal">
+                            <i class="fas fa-plus"></i> Add First Item
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-chart-bar"></i> Menu Statistics</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <div class="border-end">
+                                <h3 class="text-primary">{{ menu_items.count }}</h3>
+                                <small class="text-muted">Total Items</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <h3 class="text-success">
+                                ${% if menu_items %}
+                                    {% for item in menu_items %}{{ item.price|add:0 }}{% if not forloop.last %}+{% endif %}{% endfor %}
+                                {% else %}0{% endif %}
+                            </h3>
+                            <small class="text-muted">Total Value</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Price Range -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h6><i class="fas fa-dollar-sign"></i> Price Range</h6>
+                </div>
+                <div class="card-body">
+                    {% if menu_items %}
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <small class="text-muted">Lowest:</small>
+                            <div class="h5 text-success">
+                                RM{{ menu_items|dictsort:"price"|first.price }}
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            <small class="text-muted">Highest:</small>
+                            <div class="h5 text-success">
+                                RM{{ menu_items|dictsort:"price"|last.price }}
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center">No price data available</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Common Food Items Suggestions -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h6><i class="fas fa-lightbulb"></i> Quick Add Suggestions</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="quickAdd('Rice', '5.00')">+ Rice (RM5.00)</button>
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="quickAdd('Chicken', '12.00')">+ Chicken (RM12.00)</button>
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="quickAdd('Fish', '15.00')">+ Fish (RM15.00)</button>
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="quickAdd('Vegetables', '8.00')">+ Vegetables (RM8.00)</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Item Modal -->
+<div class="modal fade" id="addItemModal" tabindex="-1" aria-labelledby="addItemModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{% url 'menu_price' %}">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addItemModalLabel">
+                        <i class="fas fa-plus"></i> Add Menu Item
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        {{ form.name.label_tag }}
+                        {{ form.name }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.price.label_tag }}
+                        <div class="input-group">
+                            <span class="input-group-text">RM</span>
+                            {{ form.price }}
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        {{ form.description.label_tag }}
+                        {{ form.description }}
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-save"></i> Save Item
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Item Modal -->
+<div class="modal fade" id="editItemModal" tabindex="-1" aria-labelledby="editItemModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" id="editItemForm">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editItemModalLabel">
+                        <i class="fas fa-edit"></i> Edit Menu Item
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="edit-name" class="form-label">Name</label>
+                        <input type="text" class="form-control" name="name" id="edit-name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-price" class="form-label">Price</label>
+                        <div class="input-group">
+                            <span class="input-group-text">RM</span>
+                            <input type="number" class="form-control" name="price" id="edit-price" step="0.01" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-description" class="form-label">Description</label>
+                        <textarea class="form-control" name="description" id="edit-description" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-save"></i> Update Item
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function editItem(id, name, price, description) {
+    document.getElementById('edit-name').value = name;
+    document.getElementById('edit-price').value = price;
+    document.getElementById('edit-description').value = description;
+    document.getElementById('editItemForm').action = "{% url 'edit_menu_item' 0 %}".replace('0', id);
+    
+    const editModal = new bootstrap.Modal(document.getElementById('editItemModal'));
+    editModal.show();
+}
+
+function quickAdd(name, price) {
+    document.getElementById('{{ form.name.id_for_label }}').value = name;
+    document.getElementById('{{ form.price.id_for_label }}').value = price;
+    
+    const addModal = new bootstrap.Modal(document.getElementById('addItemModal'));
+    addModal.show();
+}
+
+// Auto-fill price suggestions based on item name
+document.getElementById('{{ form.name.id_for_label }}').addEventListener('input', function(e) {
+    const name = e.target.value.toLowerCase();
+    const priceField = document.getElementById('{{ form.price.id_for_label }}');
+    
+    const suggestions = {
+        'rice': '5.00',
+        'chicken': '12.00',
+        'beef': '15.00',
+        'pork': '13.00',
+        'fish': '15.00',
+        'vegetables': '8.00',
+        'noodles': '7.00',
+        'soup': '6.00'
+    };
+    
+    for (let item in suggestions) {
+        if (name.includes(item) && !priceField.value) {
+            priceField.value = suggestions[item];
+            break;
+        }
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,684 @@
+{% extends 'food_recognition/base.html' %}
+
+{% block title %}Menu & Pricing Management - AutoFood{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center flex-wrap">
+                <div>
+                    <h1 class="display-5 fw-bold mb-2">
+                        <i class="fas fa-utensils text-primary animated-icon"></i> Menu & Pricing
+                    </h1>
+                    <p class="text-muted">Manage your restaurant's menu items, categories, and pricing structure</p>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addCategoryModal">
+                        <i class="fas fa-folder-plus"></i> Add Category
+                    </button>
+                    <button type="button" class="btn btn-success pulse" data-bs-toggle="modal" data-bs-target="#addItemModal">
+                        <i class="fas fa-plus"></i> Add Menu Item
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <div class="row">
+        <!-- Menu Items Grid -->
+        <div class="col-lg-8">
+            <!-- Category Tabs -->
+            <ul class="nav nav-pills mb-4 flex-wrap" id="category-tabs">
+                <li class="nav-item">
+                    <button class="nav-link active" data-category="all" type="button">
+                        <i class="fas fa-th-large"></i> All Items
+                        <span class="badge bg-light text-dark ms-1">{{ menu_items.count }}</span>
+                    </button>
+                </li>
+                {% for category in categories %}
+                <li class="nav-item">
+                    <button class="nav-link" data-category="{{ category.id }}" type="button">
+                        <i class="{{ category.icon }}"></i> {{ category.name }}
+                        <span class="badge bg-light text-dark ms-1">{{ category.items.count }}</span>
+                    </button>
+                </li>
+                {% endfor %}
+            </ul>
+
+            <!-- Menu Items -->
+            <div id="menu-items-container" class="row g-4">
+                {% for item in menu_items %}
+                <div class="col-md-6 col-lg-4 menu-item-card" data-category="{{ item.category.id }}">
+                    <div class="card h-100 shadow-hover">
+                        <!-- Item Image -->
+                        <div class="position-relative">
+                            {% if item.image %}
+                                <img src="{{ item.image.url }}" class="card-img-top" alt="{{ item.name }}" style="height: 200px; object-fit: cover;">
+                            {% else %}
+                                <div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height: 200px;">
+                                    <i class="{{ item.category.icon }} fa-3x text-muted"></i>
+                                </div>
+                            {% endif %}
+                            
+                            <!-- Status Badge -->
+                            <div class="position-absolute top-0 end-0 p-2">
+                                {% if item.is_available %}
+                                    <span class="badge bg-success">Available</span>
+                                {% else %}
+                                    <span class="badge bg-danger">Unavailable</span>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Category Badge -->
+                            <div class="position-absolute top-0 start-0 p-2">
+                                <span class="category-badge" style="background-color: {{ item.category.color }};">
+                                    <i class="{{ item.category.icon }}"></i> {{ item.category.name }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="card-body">
+                            <h5 class="card-title">{{ item.name|title }}</h5>
+                            <p class="card-text text-muted small">{{ item.description|truncatewords:15|default:"No description available" }}</p>
+                            
+                            <!-- Price and Unit -->
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <div class="price-display">
+                                    <span class="h4 text-success mb-0">RM{{ item.price }}</span>
+                                    <small class="text-muted">{{ item.get_pricing_unit_display|lower }}</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card-footer bg-transparent">
+                            <div class="d-flex justify-content-between">
+                                <button type="button" class="btn btn-outline-primary btn-sm" 
+                                        onclick="editItem({{ item.id }}, '{{ item.name|escapejs }}', '{{ item.category.id }}', '{{ item.price }}', '{{ item.pricing_unit }}', '{{ item.description|escapejs }}', {{ item.is_available|yesno:'true,false' }})">
+                                    <i class="fas fa-edit"></i> Edit
+                                </button>
+                                <form method="post" action="{% url 'delete_menu_item' item.id %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-outline-danger btn-sm" 
+                                            onclick="return confirm('Are you sure you want to delete {{ item.name }}?')">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="col-12">
+                    <div class="text-center text-muted py-5">
+                        <i class="fas fa-utensils fa-4x mb-3 float"></i>
+                        <h4>No menu items found</h4>
+                        <p>Add your first menu item to get started with your restaurant's digital menu.</p>
+                        <button type="button" class="btn btn-success btn-lg" data-bs-toggle="modal" data-bs-target="#addItemModal">
+                            <i class="fas fa-plus"></i> Add Your First Item
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Pagination -->
+            {% if is_paginated %}
+            <nav aria-label="Menu items pagination" class="mt-4">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page=1">&laquo; First</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}">&lsaquo; Previous</a>
+                        </li>
+                    {% endif %}
+                    
+                    {% for page_num in page_obj.paginator.page_range %}
+                        {% if page_num == page_obj.number %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ page_num }}</span>
+                            </li>
+                        {% elif page_num > page_obj.number|add:'-3' and page_num < page_obj.number|add:'3' %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_num }}">{{ page_num }}</a>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.next_page_number }}">Next &rsaquo;</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">Last &raquo;</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
+
+        <!-- Sidebar with Stats and Quick Actions -->
+        <div class="col-lg-4">
+            <!-- Overview Stats -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5><i class="fas fa-chart-pie"></i> Menu Overview</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <div class="stat-card text-center">
+                                <div class="stat-value">{{ menu_items.count }}</div>
+                                <small class="text-muted">Total Items</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="stat-card text-center">
+                                <div class="stat-value">{{ categories.count }}</div>
+                                <small class="text-muted">Categories</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="stat-card text-center">
+                                <div class="stat-value">{{ available_items_count }}</div>
+                                <small class="text-muted">Available</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="stat-card text-center">
+                                <div class="stat-value">RM{{ avg_price|floatformat:2 }}</div>
+                                <small class="text-muted">Avg Price</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Categories Management -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5><i class="fas fa-folder"></i> Categories</h5>
+                </div>
+                <div class="card-body">
+                    {% for category in categories %}
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div class="d-flex align-items-center">
+                            <span class="category-badge me-2" style="background-color: {{ category.color }};">
+                                <i class="{{ category.icon }}"></i>
+                            </span>
+                            <div>
+                                <strong>{{ category.name }}</strong>
+                                <br><small class="text-muted">{{ category.items.count }} items</small>
+                            </div>
+                        </div>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-primary" onclick="editCategory({{ category.id }}, '{{ category.name|escapejs }}', '{{ category.description|escapejs }}', '{{ category.color }}', '{{ category.icon|escapejs }}')">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <form method="post" action="{% url 'delete_category' category.id %}" class="d-inline">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-outline-danger" onclick="return confirm('Delete {{ category.name }}? This will affect {{ category.items.count }} items.')">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5><i class="fas fa-bolt"></i> Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <button type="button" class="btn btn-outline-success" onclick="bulkAvailability(true)">
+                            <i class="fas fa-check-circle"></i> Mark All Available
+                        </button>
+                        <button type="button" class="btn btn-outline-warning" onclick="bulkAvailability(false)">
+                            <i class="fas fa-times-circle"></i> Mark All Unavailable
+                        </button>
+                        <button type="button" class="btn btn-outline-info" onclick="exportMenu()">
+                            <i class="fas fa-download"></i> Export Menu
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Price Analytics -->
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-dollar-sign"></i> Price Analysis</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between">
+                            <small>Lowest Price:</small>
+                            <strong class="text-success">RM{{ min_price|floatformat:2 }}</strong>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between">
+                            <small>Highest Price:</small>
+                            <strong class="text-success">RM{{ max_price|floatformat:2 }}</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Category Modal -->
+<div class="modal fade" id="addCategoryModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{% url 'menu_price' %}" id="categoryForm">
+                {% csrf_token %}
+                <input type="hidden" name="add_category" value="1" id="categoryFormType">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-folder-plus"></i> <span id="categoryModalTitle">Add Category</span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="category-name" class="form-label">Category Name</label>
+                        <input type="text" class="form-control" name="name" id="category-name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="category-description" class="form-label">Description</label>
+                        <textarea class="form-control" name="description" id="category-description" rows="2"></textarea>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label for="category-color" class="form-label">Color</label>
+                            <input type="color" class="form-control form-control-color" name="color" id="category-color" value="#007bff">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="category-icon" class="form-label">Icon Class</label>
+                            <input type="text" class="form-control" name="icon" id="category-icon" placeholder="fas fa-pizza-slice">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-save"></i> Save Category
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Item Modal -->
+<div class="modal fade" id="addItemModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="post" enctype="multipart/form-data" action="{% url 'menu_price' %}" id="itemForm">
+                {% csrf_token %}
+                <input type="hidden" name="add_item" value="1" id="itemFormType">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-plus"></i> <span id="itemModalTitle">Add Menu Item</span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="item-name" class="form-label">Item Name *</label>
+                                <input type="text" class="form-control" name="name" id="item-name" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="item-category" class="form-label">Category *</label>
+                                <select class="form-select" name="category" id="item-category" required>
+                                    <option value="">Select Category</option>
+                                    {% for category in categories %}
+                                    <option value="{{ category.id }}">{{ category.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="item-price" class="form-label">Price *</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">RM</span>
+                                    <input type="number" class="form-control" name="price" id="item-price" step="0.01" min="0" required>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="item-pricing-unit" class="form-label">Pricing Unit *</label>
+                                <select class="form-select" name="pricing_unit" id="item-pricing-unit" required>
+                                    <option value="item">Per Item</option>
+                                    <option value="serving">Per Serving</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="item-description" class="form-label">Description</label>
+                        <textarea class="form-control" name="description" id="item-description" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="mb-3">
+                                <label for="item-image" class="form-label">Item Image</label>
+                                <input type="file" class="form-control" name="image" id="item-image" accept="image/*">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <div class="form-check mt-4">
+                                    <input class="form-check-input" type="checkbox" name="is_available" id="item-available" checked>
+                                    <label class="form-check-label" for="item-available">
+                                        Available for ordering
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-save"></i> Save Item
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Category tabs functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const categoryTabs = document.querySelectorAll('#category-tabs .nav-link');
+    const menuItems = document.querySelectorAll('.menu-item-card');
+    
+    categoryTabs.forEach(tab => {
+        tab.addEventListener('click', (e) => {
+            e.preventDefault();
+            
+            // Update active tab
+            categoryTabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            
+            // Filter items
+            const categoryId = tab.dataset.category;
+            let visibleCount = 0;
+            
+            menuItems.forEach(item => {
+                const itemCategoryId = item.dataset.category;
+                
+                if (categoryId === 'all' || itemCategoryId === categoryId) {
+                    item.style.display = 'block';
+                    item.classList.add('fade-in');
+                    visibleCount++;
+                } else {
+                    item.style.display = 'none';
+                    item.classList.remove('fade-in');
+                }
+            });
+            
+            // Update the "All Items" badge count when filtering
+            if (categoryId !== 'all') {
+                console.log(`Showing ${visibleCount} items for category ${categoryId}`);
+            }
+        });
+    });
+    
+    // Add CSS animation for fade-in effect and input styling
+    const style = document.createElement('style');
+    style.textContent = `
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .menu-item-card {
+            transition: all 0.3s ease;
+        }
+        
+        /* Enhanced input field styling for better visibility */
+        .modal .form-control,
+        .modal .form-select {
+            border: 2px solid #dee2e6 !important;
+            border-radius: 6px !important;
+            padding: 8px 12px !important;
+            transition: all 0.2s ease !important;
+        }
+        
+        .modal .form-control:focus,
+        .modal .form-select:focus {
+            border-color: #0d6efd !important;
+            box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25) !important;
+            outline: none !important;
+        }
+        
+        .modal .form-control:hover,
+        .modal .form-select:hover {
+            border-color: #adb5bd !important;
+        }
+        
+        .modal .input-group .form-control {
+            border-left: 2px solid #dee2e6 !important;
+        }
+        
+        .modal .input-group-text {
+            border: 2px solid #dee2e6 !important;
+            border-right: none !important;
+            background-color: #f8f9fa !important;
+        }
+        
+        /* Enhanced textarea styling */
+        .modal textarea.form-control {
+            resize: vertical !important;
+            min-height: 80px !important;
+        }
+        
+        /* Color input styling */
+        .modal input[type="color"].form-control {
+            width: 60px !important;
+            height: 40px !important;
+            padding: 4px !important;
+        }
+    `;
+    document.head.appendChild(style);
+});
+
+// Edit category function
+function editCategory(id, name, description, color, icon) {
+    document.getElementById('categoryModalTitle').textContent = 'Edit Category';
+    document.getElementById('category-name').value = name;
+    document.getElementById('category-description').value = description;
+    document.getElementById('category-color').value = color;
+    document.getElementById('category-icon').value = icon;
+    
+    // Change form action and add hidden field for editing
+    document.getElementById('categoryForm').action = `/edit-category/${id}/`;
+    document.getElementById('categoryFormType').name = 'edit_category';
+    document.getElementById('categoryFormType').value = id;
+    
+    new bootstrap.Modal(document.getElementById('addCategoryModal')).show();
+}
+
+// Edit item function
+function editItem(id, name, categoryId, price, pricingUnit, description, isAvailable) {
+    document.getElementById('itemModalTitle').textContent = 'Edit Menu Item';
+    document.getElementById('item-name').value = name;
+    document.getElementById('item-category').value = categoryId;
+    document.getElementById('item-price').value = price;
+    document.getElementById('item-pricing-unit').value = pricingUnit;
+    document.getElementById('item-description').value = description;
+    document.getElementById('item-available').checked = isAvailable;
+    
+    // Change form action and hidden field for editing
+    document.getElementById('itemForm').action = `/edit-menu/${id}/`;
+    document.getElementById('itemFormType').name = 'edit_item';
+    document.getElementById('itemFormType').value = id;
+    
+    new bootstrap.Modal(document.getElementById('addItemModal')).show();
+}
+
+// Duplicate item function
+function duplicateItem(id) {
+    // Implementation for duplicating an item
+    console.log('Duplicating item:', id);
+}
+
+// Bulk availability function
+function bulkAvailability(available) {
+    const action = available ? 'mark all items as available' : 'mark all items as unavailable';
+    if (confirm(`Are you sure you want to ${action}?`)) {
+        // Create a form and submit it
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '{% url "bulk_availability" %}';
+        
+        // Add CSRF token
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = 'csrfmiddlewaretoken';
+        csrfInput.value = csrfToken;
+        form.appendChild(csrfInput);
+        
+        // Add availability parameter
+        const availableInput = document.createElement('input');
+        availableInput.type = 'hidden';
+        availableInput.name = 'available';
+        availableInput.value = available.toString();
+        form.appendChild(availableInput);
+        
+        // Submit the form
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+
+// Export menu function
+function exportMenu() {
+    // Implementation for menu export
+    window.location.href = '/export-menu/';
+}
+
+
+// Reset modal forms when closed
+document.querySelectorAll('.modal').forEach(modal => {
+    modal.addEventListener('hidden.bs.modal', () => {
+        const form = modal.querySelectorAll('form')[0];
+        if (form) {
+            form.reset();
+            
+            // Reset category form specifically
+            if (form.id === 'categoryForm') {
+                document.getElementById('categoryModalTitle').textContent = 'Add Category';
+                document.getElementById('categoryForm').action = "{% url 'menu_price' %}";
+                document.getElementById('categoryFormType').name = 'add_category';
+                document.getElementById('categoryFormType').value = '1';
+            }
+            
+            // Reset item form specifically
+            if (form.id === 'itemForm') {
+                document.getElementById('itemModalTitle').textContent = 'Add Menu Item';
+                form.action = "{% url 'menu_price' %}";
+                document.getElementById('itemFormType').name = 'add_item';
+                document.getElementById('itemFormType').value = '1';
+            }
+        }
+        
+        modal.querySelectorAll('.is-valid, .is-invalid').forEach(el => {
+            el.classList.remove('is-valid', 'is-invalid');
+        });
+    });
+});
+
+// Image preview functionality
+document.getElementById('item-image').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            // Create or update image preview
+            let preview = document.getElementById('image-preview');
+            if (!preview) {
+                preview = document.createElement('img');
+                preview.id = 'image-preview';
+                preview.className = 'img-thumbnail mt-2';
+                preview.style.maxWidth = '200px';
+                document.getElementById('item-image').parentNode.appendChild(preview);
+            }
+            preview.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+// Auto-suggest pricing based on item name
+document.getElementById('item-name').addEventListener('input', function(e) {
+    const name = e.target.value.toLowerCase();
+    const priceField = document.getElementById('item-price');
+    const unitField = document.getElementById('item-pricing-unit');
+    
+    // Pricing suggestions based on common food items
+    const suggestions = {
+        'rice': { price: '5.00', unit: 'portion' },
+        'chicken': { price: '12.00', unit: 'item' },
+        'beef': { price: '15.00', unit: 'item' },
+        'fish': { price: '14.00', unit: 'item' },
+        'vegetables': { price: '8.00', unit: 'portion' },
+        'noodles': { price: '7.00', unit: 'portion' },
+        'soup': { price: '6.00', unit: 'serving' },
+        'sandwich': { price: '9.00', unit: 'item' },
+        'salad': { price: '10.00', unit: 'portion' }
+    };
+    
+    for (let item in suggestions) {
+        if (name.includes(item) && !priceField.value) {
+            priceField.value = suggestions[item].price;
+            unitField.value = suggestions[item].unit;
+            priceField.classList.add('is-valid');
+            break;
+        }
+    }
+});
+
+// Enhanced form validation
+document.querySelectorAll('form').forEach(form => {
+    form.addEventListener('submit', function(e) {
+        if (!form.checkValidity()) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        form.classList.add('was-validated');
+    });
+});
+</script>
+{% endblock %}

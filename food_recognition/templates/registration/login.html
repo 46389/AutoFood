@@ -1,0 +1,203 @@
+{% extends 'food_recognition/base.html' %}
+{% block title %}Login - AutoFood{% endblock %}
+
+{% block navbar %}{% endblock %}
+
+{% block content %}
+<style>
+        body {
+            background: linear-gradient(135deg, #059669 0%, #10b981 25%, #34d399 50%, #6ee7b7 75%, #a7f3d0 100%);
+            min-height: 100vh;
+            background-attachment: fixed;
+            position: relative;
+        }
+        
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 30% 30%, rgba(16, 185, 129, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 70% 70%, rgba(34, 197, 94, 0.3) 0%, transparent 50%);
+            z-index: -1;
+            animation: backgroundFloat 15s ease-in-out infinite alternate;
+        }
+        
+        @keyframes backgroundFloat {
+            0% { transform: translateX(0px) translateY(0px); }
+            100% { transform: translateX(30px) translateY(-20px); }
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            box-shadow: 0 25px 50px rgba(16, 185, 129, 0.2);
+        }
+        
+        .btn-success, 
+        .btn-success.btn-lg, 
+        .btn.btn-success.btn-lg,
+        button.btn.btn-success.btn-lg {
+            background: linear-gradient(135deg, #10b981, #059669) !important;
+            border: 0px solid transparent !important;
+            border-width: 0 !important;
+            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4) !important;
+            transition: all 0.2s ease !important;
+            font-weight: 600 !important;
+            padding: 12px 24px !important;
+            border-radius: 8px !important;
+            font-size: 16px !important;
+            line-height: 1.5 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            height: 48px !important;
+            min-height: 48px !important;
+            max-height: 48px !important;
+            display: block !important;
+            text-align: center !important;
+            text-decoration: none !important;
+            vertical-align: middle !important;
+            cursor: pointer !important;
+            box-sizing: border-box !important;
+            overflow: hidden !important;
+        }
+        
+        .btn-success:hover,
+        .btn-success.btn-lg:hover,
+        .btn.btn-success.btn-lg:hover,
+        button.btn.btn-success.btn-lg:hover {
+            background: linear-gradient(135deg, #34d399, #10b981) !important;
+            transform: translateY(-1px) !important;
+            box-shadow: 0 12px 25px rgba(16, 185, 129, 0.5) !important;
+            border: 0px solid transparent !important;
+            border-width: 0 !important;
+            padding: 12px 24px !important;
+            font-size: 16px !important;
+            line-height: 1.5 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            height: 48px !important;
+            min-height: 48px !important;
+            max-height: 48px !important;
+            display: block !important;
+            text-align: center !important;
+            box-sizing: border-box !important;
+            overflow: hidden !important;
+        }
+        
+        .btn-success:focus, 
+        .btn-success:focus-visible,
+        .btn-success.btn-lg:focus,
+        .btn.btn-success.btn-lg:focus,
+        button.btn.btn-success.btn-lg:focus {
+            background: linear-gradient(135deg, #10b981, #059669) !important;
+            border: 0px solid transparent !important;
+            border-width: 0 !important;
+            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4), 0 0 0 3px rgba(16, 185, 129, 0.25) !important;
+            outline: none !important;
+            padding: 12px 24px !important;
+            font-size: 16px !important;
+            line-height: 1.5 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            height: 48px !important;
+            min-height: 48px !important;
+            max-height: 48px !important;
+            transform: translateY(0) !important;
+            display: block !important;
+            text-align: center !important;
+            box-sizing: border-box !important;
+            overflow: hidden !important;
+        }
+        
+        .btn-success:active, 
+        .btn-success.active,
+        .btn-success.btn-lg:active,
+        .btn.btn-success.btn-lg:active,
+        button.btn.btn-success.btn-lg:active {
+            background: linear-gradient(135deg, #059669, #047857) !important;
+            border: 0px solid transparent !important;
+            border-width: 0 !important;
+            box-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.125) !important;
+            padding: 12px 24px !important;
+            font-size: 16px !important;
+            line-height: 1.5 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            height: 48px !important;
+            min-height: 48px !important;
+            max-height: 48px !important;
+            transform: translateY(0) !important;
+            display: block !important;
+            text-align: center !important;
+            box-sizing: border-box !important;
+            overflow: hidden !important;
+        }
+        
+        .text-success {
+            color: #10b981 !important;
+        }
+        
+        .form-control {
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+        }
+        
+        .form-control:focus {
+            border-color: #10b981;
+            box-shadow: 0 0 0 0.2rem rgba(16, 185, 129, 0.25);
+        }
+        
+        /* Override toast positioning for login page */
+        #toast-container {
+            top: 20px !important;
+        }
+    </style>
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-4">
+            <div class="card shadow mt-5">
+                <div class="card-body p-5">
+                    <div class="text-center mb-4">
+                        <h2 class="text-success mb-3">
+                            <i class="fas fa-utensils fa-2x mb-2"></i>
+                            <br>AutoFood
+                        </h2>
+                        <p class="text-muted">🍽️ AI-Powered Food Recognition System</p>
+                    </div>
+                    
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="{{ form.username.id_for_label }}" class="form-label">
+                                <i class="fas fa-user"></i> Username
+                            </label>
+                            <input type="text" class="form-control" name="{{ form.username.name }}" id="{{ form.username.id_for_label }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="{{ form.password.id_for_label }}" class="form-label">
+                                <i class="fas fa-lock"></i> Password
+                            </label>
+                            <input type="password" class="form-control" name="{{ form.password.name }}" id="{{ form.password.id_for_label }}" required>
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="fas fa-sign-in-alt"></i> Login
+                            </button>
+                        </div>
+                    </form>
+                    
+                    <div class="text-center mt-3">
+                        <p>Don't have an account? <a href="{% url 'register' %}" class="text-decoration-none">Register here</a></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

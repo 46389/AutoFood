@@ -1,0 +1,679 @@
+{% extends 'food_recognition/base.html' %}
+
+{% block title %}Detection Results - AutoFood{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- Image Display -->
+        <div class="col-lg-8">
+            <!-- Confidence Threshold Adjustment - Auto reprocessing -->
+            {% if not detection.is_checked_out %}
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6><i class="fas fa-sliders-h"></i> Confidence Threshold</h6>
+                    <div id="processing-indicator" style="display: none;">
+                        <span class="spinner-border spinner-border-sm text-primary" role="status"></span>
+                        <small class="text-muted ms-2">Processing...</small>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-12">
+                            <label for="confidence-slider" class="form-label">
+                                Threshold: <span id="confidence-value">{{ detection.confidence_threshold }}</span>
+                                <small class="text-muted">(Auto-reprocesses when changed)</small>
+                            </label>
+                            <input type="range" class="form-range" id="confidence-slider" 
+                                   min="0.1" max="1.0" step="0.1" value="{{ detection.confidence_threshold }}"
+                                   oninput="handleConfidenceChange(this.value)">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4><i class="fas fa-image"></i> Detection Results</h4>
+                    <span class="badge bg-info">Current Confidence: {{ detection.confidence_threshold }}</span>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <!-- Original Image -->
+                        <div class="col-md-6">
+                            <h5>Original Image</h5>
+                            <div class="image-container">
+                                <img src="{{ detection.original_image.url }}" alt="Original" class="img-fluid rounded border">
+                            </div>
+                        </div>
+                        
+                        <!-- Segmented Image (if available) -->
+                        <div class="col-md-6">
+                            <h5>Detected Items</h5>
+                            <div class="image-container">
+                                {% if detection.segmented_image %}
+                                    <img src="{{ detection.segmented_image.url }}" alt="Segmented" class="img-fluid rounded border">
+                                {% else %}
+                                    <div class="border rounded d-flex align-items-center justify-content-center" style="height: 300px; background-color: #f8f9fa;">
+                                        <div class="text-center text-muted">
+                                            <i class="fas fa-search fa-2x mb-2"></i>
+                                            <p>Segmented image will appear here</p>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="card mt-4">
+                <div class="card-body">
+                    {% if detection.is_checked_out %}
+                        <div class="alert alert-success text-center">
+                            <i class="fas fa-check-circle"></i> This detection has been checked out
+                            {% if detection.checkout_date %}
+                                <br><small class="text-muted">Checked out on {{ detection.checkout_date|date:"M d, Y H:i" }}</small>
+                            {% endif %}
+                        </div>
+                    {% else %}
+                        <div class="row">
+                            <div class="col-md-6">
+                                <form method="post" action="{% url 'checkout' detection.id %}" style="display: inline;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-success btn-lg w-100">
+                                        <i class="fas fa-cash-register"></i> Checkout
+                                    </button>
+                                </form>
+                            </div>
+                            <div class="col-md-6">
+                                <a href="{% url 'reset_detection' detection.id %}" class="btn btn-warning btn-lg w-100" onclick="return confirm('Are you sure you want to reset this detection?')">
+                                    <i class="fas fa-redo"></i> Reset
+                                </a>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Detection Items Panel -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5><i class="fas fa-list"></i> Detected Items</h5>
+                    {% if not detection.is_checked_out %}
+                        <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addItemModal">
+                            <i class="fas fa-plus"></i> Add Item
+                        </button>
+                    {% else %}
+                        <span class="badge bg-success">Checked Out</span>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    {% if items %}
+                        {% for item in items %}
+                        <div class="detection-item">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div>
+                                    <h6 class="mb-1">{{ item.class_label|title }}</h6>
+                                    {% if item.menu_item %}
+                                        <small class="text-success">
+                                            <i class="fas fa-dollar-sign"></i> {{ item.menu_item.price }} each
+                                        </small>
+                                    {% else %}
+                                        <small class="text-muted">No price set</small>
+                                    {% endif %}
+                                </div>
+                                <div class="text-end">
+                                    <span class="badge bg-secondary confidence-badge">
+                                        {{ item.confidence|floatformat:2 }}
+                                    </span>
+                                    {% if item.is_manually_added %}
+                                        <br><small class="text-info">Manual</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="row align-items-center">
+                                {% if not detection.is_checked_out %}
+                                    <div class="col-6">
+                                        <label class="form-label small">Quantity:</label>
+                                        <div class="input-group input-group-sm">
+                                            <button class="btn btn-outline-secondary" type="button" onclick="changeQuantity({{ item.id }}, -0.1)">-</button>
+                                            <input type="number" class="form-control text-center" value="{{ item.quantity|floatformat:2 }}" 
+                                                   min="0.01" step="0.01" id="qty-{{ item.id }}" 
+                                                   data-item-id="{{ item.id }}" data-menu-price="{% if item.menu_item %}{{ item.menu_item.price }}{% else %}0{% endif %}"
+                                                   onchange="updateItemQuantity({{ item.id }})" oninput="updateItemQuantity({{ item.id }})">
+                                            <button class="btn btn-outline-secondary" type="button" onclick="changeQuantity({{ item.id }}, 0.1)">+</button>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 text-end">
+                                        <div class="btn-group-vertical btn-group-sm">
+                                            <button type="button" class="btn btn-outline-primary btn-sm" 
+                                                    onclick="openEditModal({{ item.id }}, '{{ item.class_label|escapejs }}', {{ item.quantity|floatformat:2 }}, {% if item.menu_item %}{{ item.menu_item.id }}{% else %}null{% endif %})">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <a href="{% url 'delete_detection' item.id %}" class="btn btn-outline-danger btn-sm" 
+                                               onclick="return confirm('Are you sure you want to delete this item?')">
+                                                <i class="fas fa-trash"></i>
+                                            </a>
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    <div class="col-12">
+                                        <label class="form-label small">Quantity:</label>
+                                        <div class="input-group input-group-sm">
+                                            <input type="text" class="form-control text-center" value="{{ item.quantity|floatformat:2 }}" readonly>
+                                            <span class="input-group-text">{{ item.menu_item.get_pricing_unit_display|default:"items" }}</span>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            {% if item.menu_item %}
+                            <div class="mt-2">
+                                <strong class="text-success" id="subtotal-{{ item.id }}">
+                                    Subtotal: RM{{ item.menu_item.price|floatformat:2 }} × <span id="qty-display-{{ item.id }}">{{ item.quantity|floatformat:2 }}</span> = RM<span id="price-{{ item.id }}">{{ item.calculated_price|floatformat:2 }}</span>
+                                </strong>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+
+                        <!-- Total Calculation -->
+                        <div class="border-top pt-3 mt-3">
+                            <h5 class="text-end">
+                                <strong>
+                                    Total: RM<span id="total-amount">{{ total_price|floatformat:2 }}</span>
+                                </strong>
+                            </h5>
+                        </div>
+                    {% else %}
+                        <div class="text-center text-muted py-4">
+                            <i class="fas fa-search fa-2x mb-3"></i>
+                            <p>No items detected</p>
+                            {% if not detection.is_checked_out %}
+                                <a href="{% url 'add_manual_item' detection.id %}" class="btn btn-primary">
+                                    <i class="fas fa-plus"></i> Add Item Manually
+                                </a>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- Add Item Modal -->
+<div class="modal fade" id="addItemModal" tabindex="-1" aria-labelledby="addItemModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addItemModalLabel">
+                    <i class="fas fa-plus"></i> Add Item Manually
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="addItemForm" action="{% url 'add_manual_item' detection.id %}" method="post">
+                <div class="modal-body">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="menuItemSelect" class="form-label">Menu Item *</label>
+                        <select class="form-select" id="menuItemSelect" name="menu_item" required onchange="updateItemPrice()">
+                            <option value="">Select a menu item</option>
+                            {% for menu_item in menu_items %}
+                            <option value="{{ menu_item.id }}" 
+                                    data-price="{{ menu_item.price }}" 
+                                    data-pricing-unit="{{ menu_item.pricing_unit }}"
+                                    data-name="{{ menu_item.name }}">
+                                {{ menu_item.name }} - RM{{ menu_item.price }}/{{ menu_item.get_pricing_unit_display }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="classLabelInput" class="form-label">Item Name</label>
+                        <input type="text" class="form-control" id="classLabelInput" name="class_label" 
+                               readonly style="background-color: #f8f9fa;">
+                        <small class="text-muted">This will be automatically set based on the selected menu item</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="quantityInput" class="form-label">Quantity *</label>
+                        <input type="number" class="form-control" id="quantityInput" name="quantity" 
+                               step="0.01" min="0.01" value="1.00" required oninput="updateSubtotal()" 
+                               onchange="this.value = parseFloat(this.value || 0).toFixed(2)">
+                        <small class="text-muted" id="quantityHelper">Enter quantity in servings or items</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Price Calculation</label>
+                        <div class="border rounded p-2 bg-light">
+                            <div class="d-flex justify-content-between">
+                                <span>Unit Price:</span>
+                                <span id="unitPrice">RM0.00</span>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span>Quantity:</span>
+                                <span id="displayQuantity">1.00</span>
+                            </div>
+                            <hr class="my-2">
+                            <div class="d-flex justify-content-between fw-bold">
+                                <span>Subtotal:</span>
+                                <span id="subtotal">RM0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success" id="addItemBtn" disabled>
+                        <i class="fas fa-plus"></i> Add Item
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Item Modal -->
+<div class="modal fade" id="editItemModal" tabindex="-1" aria-labelledby="editItemModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editItemModalLabel">
+                    <i class="fas fa-edit"></i> Edit Detected Item
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="editItemForm" method="post">
+                <div class="modal-body">
+                    {% csrf_token %}
+                    <input type="hidden" id="editItemId" name="item_id">
+                    
+                    <div class="mb-3">
+                        <label for="editClassLabelInput" class="form-label">Item Name</label>
+                        <input type="text" class="form-control" id="editClassLabelInput" name="class_label" required>
+                        <small class="text-muted">This will update when you change the menu item</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="editMenuItemSelect" class="form-label">Menu Item</label>
+                        <select class="form-select" id="editMenuItemSelect" name="menu_item" onchange="updateEditItemPrice()">
+                            <option value="">No menu item selected</option>
+                            {% for menu_item in menu_items %}
+                            <option value="{{ menu_item.id }}" 
+                                    data-price="{{ menu_item.price }}" 
+                                    data-pricing-unit="{{ menu_item.pricing_unit }}"
+                                    data-name="{{ menu_item.name }}">
+                                {{ menu_item.name }} - RM{{ menu_item.price }}/{{ menu_item.get_pricing_unit_display }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="editQuantityInput" class="form-label">Quantity *</label>
+                        <input type="number" class="form-control" id="editQuantityInput" name="quantity" 
+                               step="0.01" min="0.01" required oninput="updateEditSubtotal()"
+                               onchange="this.value = parseFloat(this.value || 0).toFixed(2)">
+                        <small class="text-muted" id="editQuantityHelper">Enter quantity</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Price Calculation</label>
+                        <div class="border rounded p-2 bg-light">
+                            <div class="d-flex justify-content-between">
+                                <span>Unit Price:</span>
+                                <span id="editUnitPrice">RM0.00</span>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span>Quantity:</span>
+                                <span id="editDisplayQuantity">0.00</span>
+                            </div>
+                            <hr class="my-2">
+                            <div class="d-flex justify-content-between fw-bold">
+                                <span>Subtotal:</span>
+                                <span id="editSubtotal">RM0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success" id="updateItemBtn">
+                        <i class="fas fa-save"></i> Update Item
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Add Item Modal Functions
+function updateItemPrice() {
+    const select = document.getElementById('menuItemSelect');
+    const selectedOption = select.options[select.selectedIndex];
+    const addBtn = document.getElementById('addItemBtn');
+    const unitPriceSpan = document.getElementById('unitPrice');
+    const quantityHelper = document.getElementById('quantityHelper');
+    const classLabelInput = document.getElementById('classLabelInput');
+    
+    if (selectedOption.value) {
+        const price = parseFloat(selectedOption.dataset.price);
+        const pricingUnit = selectedOption.dataset.pricingUnit;
+        const itemName = selectedOption.dataset.name;
+        
+        // Update class label
+        classLabelInput.value = itemName;
+        
+        unitPriceSpan.textContent = `RM${price.toFixed(2)}`;
+        quantityHelper.textContent = pricingUnit === 'serving' ? 
+            'Enter quantity in servings (e.g., 1.5 servings)' : 
+            'Enter quantity in items (e.g., 2 items)';
+        
+        addBtn.disabled = false;
+        updateSubtotal();
+    } else {
+        classLabelInput.value = '';
+        unitPriceSpan.textContent = 'RM0.00';
+        quantityHelper.textContent = 'Select a menu item first';
+        addBtn.disabled = true;
+        updateSubtotal();
+    }
+}
+
+function updateSubtotal() {
+    const select = document.getElementById('menuItemSelect');
+    const quantityInput = document.getElementById('quantityInput');
+    const selectedOption = select.options[select.selectedIndex];
+    const displayQuantitySpan = document.getElementById('displayQuantity');
+    const subtotalSpan = document.getElementById('subtotal');
+    
+    const quantity = parseFloat(quantityInput.value) || 0;
+    displayQuantitySpan.textContent = quantity.toFixed(2);
+    
+    if (selectedOption.value && quantity > 0) {
+        const price = parseFloat(selectedOption.dataset.price);
+        const subtotal = price * quantity;
+        subtotalSpan.textContent = `RM${subtotal.toFixed(2)}`;
+    } else {
+        subtotalSpan.textContent = 'RM0.00';
+    }
+}
+
+// Reset modal when it's closed
+document.getElementById('addItemModal').addEventListener('hidden.bs.modal', function () {
+    document.getElementById('addItemForm').reset();
+    document.getElementById('classLabelInput').value = '';
+    document.getElementById('unitPrice').textContent = 'RM0.00';
+    document.getElementById('displayQuantity').textContent = '1.00';
+    document.getElementById('subtotal').textContent = 'RM0.00';
+    document.getElementById('addItemBtn').disabled = true;
+    document.getElementById('quantityHelper').textContent = 'Enter quantity in servings or items';
+});
+
+// Real-time quantity update functions for existing items
+function updateItemQuantity(itemId) {
+    const qtyInput = document.getElementById('qty-' + itemId);
+    const qtyDisplay = document.getElementById('qty-display-' + itemId);
+    const priceDisplay = document.getElementById('price-' + itemId);
+    
+    if (!qtyInput || !qtyDisplay || !priceDisplay) return;
+    
+    const quantity = parseFloat(qtyInput.value) || 0.01;
+    const unitPrice = parseFloat(qtyInput.dataset.menuPrice) || 0;
+    
+    // Ensure minimum quantity
+    if (quantity < 0.01) {
+        qtyInput.value = 0.01;
+        return;
+    }
+    
+    // Update displays
+    qtyDisplay.textContent = quantity.toFixed(2);
+    const subtotal = quantity * unitPrice;
+    priceDisplay.textContent = subtotal.toFixed(2);
+    
+    // Update total
+    updateGrandTotal();
+    
+    // Send AJAX request to update backend (debounced)
+    clearTimeout(updateItemQuantity.timer);
+    updateItemQuantity.timer = setTimeout(() => {
+        updateItemQuantityBackend(itemId, quantity);
+    }, 1000);
+}
+
+function updateItemQuantityBackend(itemId, quantity) {
+    fetch(`/update-item-quantity/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+            item_id: itemId,
+            quantity: quantity
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Update could be successful, maybe show a subtle indication
+            console.log('Quantity updated successfully');
+        } else {
+            console.error('Failed to update quantity:', data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error updating quantity:', error);
+    });
+}
+
+function updateGrandTotal() {
+    let total = 0;
+    const priceElements = document.querySelectorAll('[id^="price-"]');
+    
+    priceElements.forEach(element => {
+        const price = parseFloat(element.textContent) || 0;
+        total += price;
+    });
+    
+    const totalElement = document.getElementById('total-amount');
+    if (totalElement) {
+        totalElement.textContent = total.toFixed(2);
+    }
+}
+
+function changeQuantity(itemId, change) {
+    const qtyInput = document.getElementById('qty-' + itemId);
+    let currentQty = parseFloat(qtyInput.value) || 0.01;
+    let newQty = Math.max(0.01, currentQty + change);
+    qtyInput.value = newQty.toFixed(2);
+    
+    // Trigger the update
+    updateItemQuantity(itemId);
+}
+
+// Initialize total calculation on page load
+document.addEventListener('DOMContentLoaded', function() {
+    updateGrandTotal();
+});
+
+// Edit Item Modal Functions
+function openEditModal(itemId, classLabel, quantity, menuItemId) {
+    // Set form values
+    document.getElementById('editItemId').value = itemId;
+    document.getElementById('editClassLabelInput').value = classLabel;
+    document.getElementById('editQuantityInput').value = quantity.toFixed(2);
+    
+    // Set menu item selection
+    const menuSelect = document.getElementById('editMenuItemSelect');
+    menuSelect.value = menuItemId || '';
+    
+    // Update form action to point to edit endpoint
+    document.getElementById('editItemForm').action = `/edit-item/${itemId}/`;
+    
+    // Update price displays
+    updateEditItemPrice();
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('editItemModal'));
+    modal.show();
+}
+
+function updateEditItemPrice() {
+    const select = document.getElementById('editMenuItemSelect');
+    const selectedOption = select.options[select.selectedIndex];
+    const unitPriceSpan = document.getElementById('editUnitPrice');
+    const quantityHelper = document.getElementById('editQuantityHelper');
+    const classLabelInput = document.getElementById('editClassLabelInput');
+    
+    if (selectedOption.value) {
+        const price = parseFloat(selectedOption.dataset.price);
+        const pricingUnit = selectedOption.dataset.pricingUnit;
+        const itemName = selectedOption.dataset.name;
+        
+        // Update class label
+        classLabelInput.value = itemName;
+        
+        unitPriceSpan.textContent = `RM${price.toFixed(2)}`;
+        quantityHelper.textContent = pricingUnit === 'serving' ? 
+            'Enter quantity in servings (e.g., 1.5 servings)' : 
+            'Enter quantity in items (e.g., 2 items)';
+    } else {
+        // Don't clear class label when no menu item selected, keep original
+        unitPriceSpan.textContent = 'RM0.00';
+        quantityHelper.textContent = 'Enter quantity';
+    }
+    
+    updateEditSubtotal();
+}
+
+function updateEditSubtotal() {
+    const select = document.getElementById('editMenuItemSelect');
+    const quantityInput = document.getElementById('editQuantityInput');
+    const selectedOption = select.options[select.selectedIndex];
+    const displayQuantitySpan = document.getElementById('editDisplayQuantity');
+    const subtotalSpan = document.getElementById('editSubtotal');
+    
+    const quantity = parseFloat(quantityInput.value) || 0;
+    displayQuantitySpan.textContent = quantity.toFixed(2);
+    
+    if (selectedOption.value && quantity > 0) {
+        const price = parseFloat(selectedOption.dataset.price);
+        const subtotal = price * quantity;
+        subtotalSpan.textContent = `RM${subtotal.toFixed(2)}`;
+    } else {
+        subtotalSpan.textContent = 'RM0.00';
+    }
+}
+
+// Reset edit modal when closed
+document.getElementById('editItemModal').addEventListener('hidden.bs.modal', function () {
+    document.getElementById('editItemForm').reset();
+    document.getElementById('editUnitPrice').textContent = 'RM0.00';
+    document.getElementById('editDisplayQuantity').textContent = '0.00';
+    document.getElementById('editSubtotal').textContent = 'RM0.00';
+    document.getElementById('editQuantityHelper').textContent = 'Enter quantity';
+});
+
+// Debounce timer for auto-reprocessing
+let reprocessTimer;
+let isProcessing = false;
+
+function updateConfidenceDisplay(value) {
+    document.getElementById('confidence-value').textContent = value;
+}
+
+function handleConfidenceChange(value) {
+    // Update display immediately
+    updateConfidenceDisplay(value);
+    
+    // Clear existing timer
+    if (reprocessTimer) {
+        clearTimeout(reprocessTimer);
+    }
+    
+    // Don't start new reprocessing if already processing
+    if (isProcessing) {
+        return;
+    }
+    
+    // Set new timer for auto-reprocessing (wait 1 second after user stops adjusting)
+    reprocessTimer = setTimeout(() => {
+        autoReprocessImage(value);
+    }, 1000);
+}
+
+function autoReprocessImage(confidence) {
+    if (isProcessing) return;
+    
+    isProcessing = true;
+    
+    // Show processing indicator
+    const indicator = document.getElementById('processing-indicator');
+    if (indicator) {
+        indicator.style.display = 'block';
+    }
+    
+    // Disable slider during processing
+    const slider = document.getElementById('confidence-slider');
+    slider.disabled = true;
+    
+    // Create form and submit
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = "{% url 'process_image' %}";
+    
+    // Add CSRF token
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+    const csrfInput = document.createElement('input');
+    csrfInput.type = 'hidden';
+    csrfInput.name = 'csrfmiddlewaretoken';
+    csrfInput.value = csrfToken ? csrfToken.value : '{{ csrf_token }}';
+    form.appendChild(csrfInput);
+    
+    // Add reprocess ID
+    const reprocessInput = document.createElement('input');
+    reprocessInput.type = 'hidden';
+    reprocessInput.name = 'reprocess';
+    reprocessInput.value = '{{ detection.id }}';
+    form.appendChild(reprocessInput);
+    
+    // Add confidence threshold
+    const confidenceInput = document.createElement('input');
+    confidenceInput.type = 'hidden';
+    confidenceInput.name = 'confidence_threshold';
+    confidenceInput.value = confidence;
+    form.appendChild(confidenceInput);
+    
+    document.body.appendChild(form);
+    form.submit();
+}
+
+// Add CSRF token for AJAX calls if needed
+document.addEventListener('DOMContentLoaded', function() {
+    // Get CSRF token
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (!csrfToken) {
+        // Add CSRF token if not present
+        const newToken = document.createElement('input');
+        newToken.type = 'hidden';
+        newToken.name = 'csrfmiddlewaretoken';
+        newToken.value = '{{ csrf_token }}';
+        document.body.appendChild(newToken);
+    }
+});
+</script>
+{% endblock %}

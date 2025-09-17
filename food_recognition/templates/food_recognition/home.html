@@ -1,0 +1,304 @@
+{% extends 'food_recognition/base.html' %}
+
+{% block title %}Home - AutoFood{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4><i class="fas fa-camera"></i> Food Detection</h4>
+                </div>
+                <div class="card-body">
+                    <!-- Camera/Upload Toggle -->
+                    <div class="mb-4">
+                        <div class="btn-group" role="group">
+                            <input type="radio" class="btn-check" name="input-mode" id="camera-mode" autocomplete="off" checked>
+                            <label class="btn btn-outline-success" for="camera-mode">
+                                <i class="fas fa-camera"></i> Camera
+                            </label>
+                            
+                            <input type="radio" class="btn-check" name="input-mode" id="upload-mode" autocomplete="off">
+                            <label class="btn btn-outline-success" for="upload-mode">
+                                <i class="fas fa-upload"></i> Upload Image
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Camera Section -->
+                    <div id="camera-section" class="input-section">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="camera-preview" id="camera-preview">
+                                    <video id="video" autoplay style="display: none; width: 100%; max-height: 400px;"></video>
+                                    <canvas id="canvas" style="display: none;"></canvas>
+                                    <div id="camera-placeholder" class="text-center">
+                                        <i class="fas fa-camera fa-3x text-muted mb-3"></i>
+                                        <br>
+                                        <button type="button" class="btn btn-success" onclick="startCamera()">
+                                            <i class="fas fa-play"></i> Start Camera
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="d-grid gap-2">
+                                    <button type="button" class="btn btn-primary" onclick="capturePhoto()" id="capture-btn" disabled>
+                                        <i class="fas fa-camera"></i> Capture Photo
+                                    </button>
+                                    <button type="button" class="btn btn-secondary" onclick="stopCamera()" id="stop-btn" disabled>
+                                        <i class="fas fa-stop"></i> Stop Camera
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Upload Section -->
+                    <div id="upload-section" class="input-section" style="display: none;">
+                        <form method="post" enctype="multipart/form-data" action="{% url 'process_image' %}" id="upload-form" onsubmit="showLoadingOverlay()">
+                            {% csrf_token %}
+                            <input type="hidden" name="confidence_threshold" id="upload-confidence" value="0.5">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <div class="mb-3">
+                                        {{ form.image.label_tag }}
+                                        {{ form.image }}
+                                    </div>
+                                    <div id="image-preview" class="camera-preview" style="display: none;">
+                                        <img id="preview-img" src="" alt="Preview" style="max-width: 100%; max-height: 400px;">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <button type="submit" class="btn btn-success btn-lg w-100" disabled id="process-btn">
+                                        <i class="fas fa-brain"></i> Process Image
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Camera Capture Form (hidden) -->
+                    <form method="post" enctype="multipart/form-data" action="{% url 'process_image' %}" id="camera-form" style="display: none;" onsubmit="showLoadingOverlay()">
+                        {% csrf_token %}
+                        <input type="hidden" name="confidence_threshold" id="camera-confidence">
+                        <input type="file" name="image" id="camera-image-input" style="display: none;">
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-cog"></i> Settings</h5>
+                </div>
+                <div class="card-body">
+                    <!-- Confidence Threshold -->
+                    <div class="mb-4">
+                        <label for="confidence-threshold" class="form-label">
+                            <i class="fas fa-chart-line"></i> Confidence Threshold: <span id="confidence-value">0.5</span>
+                        </label>
+                        <input type="range" class="form-range confidence-slider" 
+                               id="confidence-threshold" min="0.1" max="1.0" step="0.1" value="0.5"
+                               oninput="updateConfidenceValue(this.value)">
+                    </div>
+
+                    <!-- Quick Stats -->
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <div class="border rounded p-2">
+                                <div class="h4 text-success">{{ user.detection_set.count }}</div>
+                                <small class="text-muted">Total Scans</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="border rounded p-2">
+                                <div class="h4 text-info">{{ menu_items.count }}</div>
+                                <small class="text-muted">Menu Items</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5><i class="fas fa-bolt"></i> Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'dashboard' %}" class="btn btn-outline-primary">
+                            <i class="fas fa-chart-bar"></i> View Dashboard
+                        </a>
+                        <a href="{% url 'menu_price' %}" class="btn btn-outline-info">
+                            <i class="fas fa-list"></i> Manage Menu
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Loading Overlay -->
+<div id="loading-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 9999;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; color: white;">
+        <div class="spinner-border text-light mb-3" role="status" style="width: 3rem; height: 3rem;">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <h4>Processing Image...</h4>
+        <p>Please wait while we analyze your food</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let video = document.getElementById('video');
+let canvas = document.getElementById('canvas');
+let stream = null;
+
+// Toggle between camera and upload modes
+document.querySelectorAll('input[name="input-mode"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+        if (this.id === 'camera-mode') {
+            document.getElementById('camera-section').style.display = 'block';
+            document.getElementById('upload-section').style.display = 'none';
+        } else {
+            document.getElementById('camera-section').style.display = 'none';
+            document.getElementById('upload-section').style.display = 'block';
+            stopCamera();
+        }
+    });
+});
+
+// Camera functions
+async function startCamera() {
+    try {
+        // Get available video devices
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+        
+        let deviceId = null;
+        
+        // Try to use device 1 if available, otherwise use device 0
+        if (videoDevices.length > 1) {
+            deviceId = videoDevices[1].deviceId; // Device 1
+        } else if (videoDevices.length > 0) {
+            deviceId = videoDevices[0].deviceId; // Device 0
+        }
+        
+        const constraints = {
+            video: {
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            }
+        };
+        
+        // Add deviceId if we found one
+        if (deviceId) {
+            constraints.video.deviceId = { exact: deviceId };
+        }
+        
+        try {
+            stream = await navigator.mediaDevices.getUserMedia(constraints);
+        } catch (deviceErr) {
+            // If specific device fails and we tried device 1, fallback to device 0
+            if (deviceId && videoDevices.length > 1) {
+                console.warn('Device 1 failed, falling back to device 0:', deviceErr);
+                constraints.video.deviceId = { exact: videoDevices[0].deviceId };
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+            } else {
+                throw deviceErr;
+            }
+        }
+        
+        video.srcObject = stream;
+        video.style.display = 'block';
+        document.getElementById('camera-placeholder').style.display = 'none';
+        document.getElementById('capture-btn').disabled = false;
+        document.getElementById('stop-btn').disabled = false;
+    } catch (err) {
+        console.error('Error accessing camera:', err);
+        alert('Unable to access camera. Please check permissions.');
+    }
+}
+
+function stopCamera() {
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+    }
+    video.style.display = 'none';
+    document.getElementById('camera-placeholder').style.display = 'block';
+    document.getElementById('capture-btn').disabled = true;
+    document.getElementById('stop-btn').disabled = true;
+}
+
+function capturePhoto() {
+    // Show loading overlay immediately when capture is clicked
+    showLoadingOverlay();
+    
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    
+    // Convert canvas to blob and create form data
+    canvas.toBlob(function(blob) {
+        const formData = new FormData();
+        const file = new File([blob], 'camera-capture.jpg', { type: 'image/jpeg' });
+        
+        // Create a file input and trigger form submission
+        const fileInput = document.getElementById('camera-image-input');
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        fileInput.files = dt.files;
+        
+        // Set confidence threshold
+        document.getElementById('camera-confidence').value = document.getElementById('confidence-threshold').value;
+        
+        // Submit the form
+        document.getElementById('camera-form').submit();
+    }, 'image/jpeg', 0.8);
+}
+
+// File upload preview
+document.getElementById('{{ form.image.id_for_label }}').addEventListener('change', function(event) {
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('preview-img').src = e.target.result;
+            document.getElementById('image-preview').style.display = 'block';
+            document.getElementById('process-btn').disabled = false;
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+// Show loading overlay function
+function showLoadingOverlay() {
+    document.getElementById('loading-overlay').style.display = 'block';
+}
+
+// Hide loading overlay function
+function hideLoadingOverlay() {
+    document.getElementById('loading-overlay').style.display = 'none';
+}
+
+// Update confidence threshold in both forms
+document.getElementById('confidence-threshold').addEventListener('input', function() {
+    document.getElementById('upload-confidence').value = this.value;
+    document.getElementById('camera-confidence').value = this.value;
+});
+
+// Update confidence value display
+function updateConfidenceValue(value) {
+    document.getElementById('confidence-value').textContent = value;
+    document.getElementById('upload-confidence').value = value;
+    document.getElementById('camera-confidence').value = value;
+}
+</script>
+{% endblock %}
