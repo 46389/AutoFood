@@ -47,18 +47,13 @@ python manage.py migrate
 python manage.py createsuperuser
 ```
 
-5) (Optional) Collect static files
-```powershell
-python manage.py collectstatic --noinput
-```
-
-6) Seed categories and menu items (recommended)
+5) Seed categories and menu items (recommended)
 ```powershell
 python manage.py setup_categories
 python manage.py setup_menu_items
 ```
 
-7) Run the development server
+6) Run the development server
 ```powershell
 python manage.py runserver
 ```
