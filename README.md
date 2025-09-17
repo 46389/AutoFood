@@ -47,7 +47,7 @@ python manage.py migrate
 python manage.py createsuperuser
 ```
 
-5) Seed categories and menu items (recommended)
+5) Create categories and menu items (recommended)
 ```powershell
 python manage.py setup_categories
 python manage.py setup_menu_items
@@ -64,26 +64,6 @@ Open `http://127.0.0.1:8000/` in your browser.
 - Navigate to the home/dashboard and upload a food image.
 - The app will run detection, estimate grams, and compute price based on the seeded menu.
 - Review results and proceed to checkout if needed.
-
-## Data and media
-- Uploaded images: `media/uploads/`
-- Detection outputs: `media/predictions/`
-- Menu item images: `media/menu_items/`
-
-## Management commands
-- `python manage.py setup_categories` – seeds default `FoodCategory` entries
-- `python manage.py setup_menu_items` – seeds sample `MenuItem` entries with prices/images
-
-## Environment and configuration
-- Default DB: SQLite (`db.sqlite3`)
-- For production, set `DEBUG=False` and configure `ALLOWED_HOSTS` in `AutoFood/settings.py`.
-- Static and media handling may require a proper web server in production (e.g., Nginx).
-
-## Troubleshooting
-- PyTorch/torchvision build mismatch: install a compatible pair from the official index (CPU or CUDA).
-- OpenCV issues on headless servers: consider `opencv-python-headless`.
-- If migrations fail, delete `db.sqlite3` (dev only) and rerun `migrate` and seed commands.
-- If models are not found, verify files in `ai_models/` and file paths used in views.
 
 ## License
 Educational use only. Add an explicit license if you plan to distribute.
