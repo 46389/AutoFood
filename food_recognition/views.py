@@ -24,14 +24,13 @@ try:
 except ImportError:
     PIL_AVAILABLE = False
 
-# Optional imports for YOLO functionality
+# Optional imports for YOLO functionality (centralized in yolo_loader)
 try:
-    import cv2
-    import numpy as np
-    from ultralytics import YOLO
-    YOLO_AVAILABLE = True
-except ImportError:
-    YOLO_AVAILABLE = False
+	import cv2
+	import numpy as np
+	from .yolo_loader import get_food_model, get_plate_model, YOLO_AVAILABLE
+except Exception:
+	YOLO_AVAILABLE = False
 
 from .models import Detection, DetectedItem, MenuItem, FoodCategory
 from .forms import ImageUploadForm, MenuItemForm, DetectedItemForm, CustomUserCreationForm, FoodCategoryForm, MenuSearchForm
@@ -198,13 +197,11 @@ def run_yolo_inference(image_path, confidence_threshold):
     try:
         detections = []
         
-        # 1. Food detection with YOLOv11-seg - use PT file
-        pt_model_path = os.path.join('ai_models', 'yolo11_cbam_best.pt')
-        
+        # 1. Food detection with preloaded YOLOv11-seg model
         onnx_failed = True  # Always report as ONNX failed since we're using PT
-        
-        if os.path.exists(pt_model_path):
-            food_model = YOLO(pt_model_path, task='segment')
+
+        food_model = get_food_model()
+        if food_model is not None:
             food_results = food_model(
                 image_path, 
                 conf=confidence_threshold, 
@@ -214,7 +211,7 @@ def run_yolo_inference(image_path, confidence_threshold):
                 verbose=False
             )
         else:
-            raise Exception("PT model file not found for food detection")
+            raise Exception("PT model not loaded for food detection")
         
         
         for result in food_results:
@@ -262,19 +259,11 @@ def run_yolo_inference(image_path, confidence_threshold):
                         'type': 'food'
                     })
         
-        # 2. Plate detection with YOLOE - use PT file
+        # 2. Plate detection with preloaded model
         try:
-            # Initialize YOLOE model for plate detection
-            plate_pt_path = os.path.join('ai_models', 'yoloe-11m-seg.pt')
-            
-            if os.path.exists(plate_pt_path):
-                plate_model = YOLO(plate_pt_path)
-                print(f"Loaded plate PT model as segmentation model")
-                
-                # Set text prompt for YOLOE to detect plates
-                plate_model.set_classes(["plate"])
-            else:
-                raise Exception("PT model file not found for plate detection")
+            plate_model = get_plate_model()
+            if plate_model is None:
+                raise Exception("PT model not loaded for plate detection")
             
             # Run plate detection with text prompt
             plate_results = plate_model(
