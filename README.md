@@ -25,10 +25,14 @@ manage.py                 # Django entrypoint
 requirements.txt          # Python dependencies
 ```
 
-## System Screenshots
-
+## Sample Screenshots
+Food Recognition
 <img width="940" height="561" alt="image" src="https://github.com/user-attachments/assets/d928ac09-7819-4063-9f0d-531f98997315" />
+
+Data Analytics Dashboard
 <img width="940" height="535" alt="image" src="https://github.com/user-attachments/assets/88a495b6-8609-4309-8991-2d111ac58007" />
+
+Menu Management
 <img width="940" height="560" alt="image" src="https://github.com/user-attachments/assets/e0e4f352-236c-4002-a12f-ced0e2deefe9" />
 
 
