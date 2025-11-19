@@ -10,9 +10,9 @@ A Django-based web application that recognizes food from images using YOLO model
 - SQLite by default, easy local setup on Windows
 
 ## Tech Stack
-- Django 5.x
-- Python 3.10–3.12
-- Ultralytics YOLO, PyTorch, OpenCV, NumPy, Pillow
+- Django
+- Python
+- Ultralytics YOLO, OpenCV, NumPy, Pillow
 
 ## Repository layout
 ```
@@ -25,45 +25,11 @@ manage.py                 # Django entrypoint
 requirements.txt          # Python dependencies
 ```
 
-## Getting started (Windows PowerShell)
-1) Create and activate a virtual environment
-```powershell
-py -3.11 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-```
+## System Screenshots
 
-2) Install dependencies
-```powershell
-pip install --upgrade pip
-pip install -r requirements.txt
-```
+<img width="940" height="561" alt="image" src="https://github.com/user-attachments/assets/d928ac09-7819-4063-9f0d-531f98997315" />
+<img width="940" height="535" alt="image" src="https://github.com/user-attachments/assets/88a495b6-8609-4309-8991-2d111ac58007" />
+<img width="940" height="560" alt="image" src="https://github.com/user-attachments/assets/e0e4f352-236c-4002-a12f-ced0e2deefe9" />
 
-3) Ensure model weights exist
-- Place YOLO weight files in `ai_models/` (already present: `yolo11_cbam_best.pt`, `yoloe-11m-seg.pt`).
 
-4) Apply migrations and create a superuser
-```powershell
-python manage.py migrate
-python manage.py createsuperuser
-```
 
-5) Create categories and menu items (recommended)
-```powershell
-python manage.py setup_categories
-python manage.py setup_menu_items
-```
-
-6) Run the development server
-```powershell
-python manage.py runserver
-```
-Open `http://127.0.0.1:8000/` in your browser.
-
-## How to use
-- Register or log in.
-- Navigate to the home/dashboard and upload a food image.
-- The app will run detection, estimate grams, and compute price based on the seeded menu.
-- Review results and proceed to checkout if needed.
-
-## License
-Educational use only. Add an explicit license if you plan to distribute.
